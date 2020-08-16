@@ -1,8 +1,9 @@
 # src/models/UserModel
 
 from marshmallow import fields, Schema
+from ..app import bcrypt
 import datetime
-
+from .BlogpostModel import BlogpostSchema
 from . import db
 
 
@@ -19,6 +20,7 @@ class UserModel(db.Model):
     password = db.Column(db.String(128), nullable=False)
     created_at = db.Coumn(db.Datetime)
     modified_at = db.Column(db.Datetime)
+    blogposts = db.relationship('BlogpostModel', backref = 'users', lazy=True)
 
     # class Constructor
     def __init__(self, data):
@@ -27,7 +29,7 @@ class UserModel(db.Model):
         """
         self.name = data.get('name')
         self.email = data.get('email')
-        self.password = data.get('password')
+        self.password = self.__generate_hash(data.get('password'))
         self.created_at = datetime.datetime.utcnow()
         self.modified_at = datetime.datetime.utcnow()
     
@@ -37,6 +39,8 @@ class UserModel(db.Model):
     
     def update(self, data):
         for key, item in data.items():
+            if key == 'password':
+                self.password = self.__generate_hash(data.get('password'))
             setattr(self, key, item)
         self.modified_at = datetime.datetime.utcnow()
         db.session.commit()
@@ -46,7 +50,7 @@ class UserModel(db.Model):
         db.session.commit()
     
     @staticmethod
-    def get_all_users()
+    def get_all_users():
         return UserModel.query.all()
 
     @staticmethod
@@ -55,3 +59,21 @@ class UserModel(db.Model):
 
     def __repr(self):
         return '<id {}>'.format(self.id)
+
+    def __generate_hash(self, password):
+        return bcrypt.generate_password_hash(password, round=10).decode("utf-8")
+
+    def check_hash(self, password):
+        return bcrypt.check_password_hash(self.password, password)
+
+class UserSchema(Schema):
+    """
+    User Schema
+    """
+    id = fields.Int(dump_only=True)
+    name = fields.Str(required=True)
+    email = fields.Email(required=True)
+    password = fields.Str(required=True)
+    created_at = fields.Datetime(dump_only=True)
+    modified_at = fields.Datetime(dump_only=True)
+    blogposts = fields.Nested(BlogpostSchema, many=True)
